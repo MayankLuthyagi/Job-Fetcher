@@ -69,7 +69,7 @@ export async function parseContent(content, api_key){
 async function generateContent(content, api_key){
     try {
         const genAI = new GoogleGenerativeAI(api_key);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const prompt = `html_content = ${content}
         Extract and return the following details in a well-structured **MongoDB-compatible JSON format**, ensuring no unknown ASCII values are present. The JSON structure should be:
