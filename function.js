@@ -36,10 +36,19 @@ const Job = mongoose.model('Job', jobSchema);
 
 export async function fetchingContent(url) {
     try {
-        const response = await fetch(url);
+        // Add headers to mimic a real browser
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
+            'Accept': 'application/json', // Assuming you are fetching JSON
+        };
+
+        const response = await fetch(url, { headers: headers }); // <-- Add headers here
+
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            // Log the actual status text for more detail
+            throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
         }
+        
         const data = await response.json();
         if (data) {
             return data;
@@ -137,7 +146,7 @@ async function generateContent(content, api_key){
         const data = await result.response.text().slice(8, -5);
         saveJob(JSON.parse(data));  // Ensure correct output
     } catch (error) {
-        console.error('Error generating content: Problem with Gemini Api');
+        console.error('Error in generateContent:', error);
     }
 }
 
