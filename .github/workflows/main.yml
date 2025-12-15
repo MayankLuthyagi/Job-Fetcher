@@ -2,7 +2,7 @@ name: Scheduled Main.js Execution
 
 on:
   schedule:
-    - cron: "0 4,7,10,13,16 * * *" # Runs every hour at 10am, 1pm, 4pm, 7pm and 10pm
+    - cron: "30 4 * * *" # Runs daily at 10:00 AM IST
   workflow_dispatch:  # Allows manual trigger
 permissions:
   actions: read  # Change to write if needed
