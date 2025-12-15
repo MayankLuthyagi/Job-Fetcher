@@ -1,8 +1,8 @@
 import dotenv from "dotenv";
 dotenv.config();
 const urls = process.env.URLS.split(",")
-const api_key = process.env.API_KEY.split(",");
-import {fetchingContent, parseContent, deleteJobs} from "./function.js";
+const api_key = process.env.API_KEY;
+import { fetchingContent, parseContent, deleteJobs } from "./function.js";
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -11,13 +11,11 @@ function delay(ms) {
 console.log("Starting job at:", new Date().toISOString());
 
 (async () => {
-    let i = 0;
     for (const url of urls) {
         console.log(`Fetching: url at ${new Date().toISOString()}`);
         const data = await fetchingContent(url);
         if (data) {
-            await parseContent(data, api_key[i]);
-            i = (i + 1) % api_key.length;
+            await parseContent(data, api_key);
             await delay(1000);
         }
     }
