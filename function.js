@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Mistral } from "@mistralai/mistralai";
 import dotenv from "dotenv";
 import axios from "axios";
 dotenv.config();
@@ -14,8 +14,8 @@ const jobSchema = new mongoose.Schema({
     job_id: { type: Number }, // Unique identifier for the job
     role: { type: String, required: true }, // Job title or role being offered
     company: { type: String, required: true }, // Company name
-    category:{type:String, required: true},
-    sub_category:{type:String, required:true},
+    category: { type: String, required: true },
+    sub_category: { type: String, required: true },
     skills: { type: [String], default: [] }, // Required skills (add based on job role if not mentioned)
     experience_min: { type: Number, default: 0 }, // Min years of experience
     experience_max: { type: Number, default: 0 }, // Max years of experience
@@ -39,16 +39,16 @@ export async function fetchingContent(url) {
         // Add headers to mimic a real browser
         const headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
-            'Accept': 'application/json', // Assuming you are fetching JSON
+            'Accept': 'application/json',
         };
 
-        const response = await fetch(url, { headers: headers }); // <-- Add headers here
+        const response = await fetch(url, { headers: headers });
 
         if (!response.ok) {
             // Log the actual status text for more detail
             throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         if (data) {
             return data;
@@ -60,9 +60,9 @@ export async function fetchingContent(url) {
     }
 }
 
-export async function parseContent(content, api_key){
+export async function parseContent(content, api_key) {
     try {
-        for(let post in content){
+        for (let post in content) {
             const res = content[post]?.content?.rendered;
             if (res) {
                 await generateContent(res, api_key);
@@ -70,15 +70,14 @@ export async function parseContent(content, api_key){
                 throw new Error(`problem in parseContent`);
             }
         }
-    } catch(error){
+    } catch (error) {
         console.error('Error Parsing Data: ', error);
     }
 }
 
-async function generateContent(content, api_key){
+async function generateContent(content, api_key) {
     try {
-        const genAI = new GoogleGenerativeAI(api_key);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const mistral = new Mistral({ apiKey: api_key });
 
         const prompt = `html_content = ${content}
         Extract and return the following details in a well-structured **MongoDB-compatible JSON format**, ensuring no unknown ASCII values are present. The JSON structure should be:
@@ -142,21 +141,42 @@ async function generateContent(content, api_key){
         }
         `;
 
-        const result = await model.generateContent(prompt);
-        const data = await result.response.text().slice(8, -5);
-        saveJob(JSON.parse(data));  // Ensure correct output
+        const response = await mistral.chat.complete({
+            model: "mistral-small-latest",
+            messages: [{ role: "user", content: prompt }],
+        });
+
+        let textOutput = null;
+        if (response?.choices && response.choices.length > 0) {
+            textOutput = response.choices[0].message?.content ?? response.choices[0].text ?? response.choices[0];
+        } else if (typeof response === 'string') {
+            textOutput = response;
+        } else if (response && response.output) {
+            textOutput = response.output[0]?.content?.[0]?.text ?? JSON.stringify(response);
+        } else {
+            textOutput = JSON.stringify(response);
+        }
+
+        const startIdx = textOutput.indexOf('{');
+        const endIdx = textOutput.lastIndexOf('}');
+        if (startIdx === -1 || endIdx === -1) {
+            throw new Error('Could not extract JSON object from model output');
+        }
+        const jsonStr = textOutput.slice(startIdx, endIdx + 1);
+        const parsed = JSON.parse(jsonStr);
+        await saveJob(parsed);
     } catch (error) {
         console.error('Error in generateContent:', error);
     }
 }
 
-async function saveJob(data){
-    try{
+async function saveJob(data) {
+    try {
         if (typeof data !== 'object' || data === null) {
             throw new Error("Invalid data format: Data must be an object");
         }
         const url = data['apply_link'].split('&')[0];
-        if(await checkLink(url)){
+        if (await checkLink(url)) {
             data['apply_link'] = url;
         }
         const existData = await Job.findOne({
@@ -171,9 +191,9 @@ async function saveJob(data){
             category: data.category,
             sub_category: data.sub_category
         });
-        if(existData || existData2 || existData3){
+        if (existData || existData2 || existData3) {
             console.log("Job already exists in the database");
-            return ;
+            return;
         }
         const jobDetails = new Job({ ...data });
         await jobDetails.save();
@@ -183,11 +203,11 @@ async function saveJob(data){
     }
 }
 
-export async function deleteJobs(){
-    try{
+export async function deleteJobs() {
+    try {
         const twoMonthAgo = new Date();
-        twoMonthAgo.setMonth(twoMonthAgo.getMonth()-2);
-        const oldJobs = await Job.deleteMany({created_at: {$lt: twoMonthAgo}});
+        twoMonthAgo.setMonth(twoMonthAgo.getMonth() - 2);
+        const oldJobs = await Job.deleteMany({ created_at: { $lt: twoMonthAgo } });
         console.log(`Deleted ${oldJobs} old jobs.`);
         await mongoose.connection.close();
         console.log("MongoDB connection closed.");
