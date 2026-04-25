@@ -1,6 +1,10 @@
 import dotenv from "dotenv";
 dotenv.config();
-const urls = process.env.URLS.split(",")
+const urls = process.env.URLS
+    .replace(/[\[\]]/g, '')  // Remove [ and ] brackets
+    .split(",")
+    .map(url => url.trim())  // Remove any extra spaces
+    .filter(url => url.length > 0);  // Remove empty entries
 const api_key = process.env.API_KEY;
 import { fetchingContent, parseContent, deleteJobs } from "./function.js";
 
