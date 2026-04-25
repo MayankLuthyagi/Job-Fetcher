@@ -157,13 +157,22 @@ async function generateContent(content, api_key) {
             textOutput = JSON.stringify(response);
         }
 
+        // Strip markdown code fences
+        textOutput = textOutput.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+        
         const startIdx = textOutput.indexOf('{');
         const endIdx = textOutput.lastIndexOf('}');
         if (startIdx === -1 || endIdx === -1) {
             throw new Error('Could not extract JSON object from model output');
         }
         const jsonStr = textOutput.slice(startIdx, endIdx + 1);
-        const parsed = JSON.parse(jsonStr);
+        
+        // Fix MongoDB NumberInt() syntax — not valid JSON
+        const cleanedJson = jsonStr
+            .replace(/NumberInt\("?(\d+)"?\)/g, '$1')
+            .replace(/NumberInt\((\d+)\)/g, '$1');
+        
+        const parsed = JSON.parse(cleanedJson);
         await saveJob(parsed);
     } catch (error) {
         console.error('Error in generateContent:', error);
@@ -207,8 +216,8 @@ export async function deleteJobs() {
     try {
         const twoMonthAgo = new Date();
         twoMonthAgo.setMonth(twoMonthAgo.getMonth() - 2);
-        const oldJobs = await Job.deleteMany({ created_at: { $lt: twoMonthAgo } });
-        console.log(`Deleted ${oldJobs} old jobs.`);
+        const result = await Job.deleteMany({ created_at: { $lt: twoMonthAgo } });
+        console.log(`Deleted ${result.deletedCount} old jobs.`);
         await mongoose.connection.close();
         console.log("MongoDB connection closed.");
     }
